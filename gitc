@@ -1,0 +1,25 @@
+#!/bin/bash
+# Helper git untuk repo di /sdcard/ (FUSE filesystem).
+# GIT_OBJECT_DIRECTORY menggantikan .git/objects/, jadi kita sync
+# semua object ke /tmp dulu sebelum jalan, lalu sync balik.
+set -euo pipefail
+
+if [ $# -eq 0 ]; then
+    echo "Usage: bash gitc <git-command> [args...]"
+    echo "Example: bash gitc add manga.py && bash gitc commit -m 'pesan'"
+    exit 1
+fi
+
+PROJ=$(basename "$(pwd)")
+GIT_OBJ_DIR=/tmp/gitc-objects-$PROJ
+
+# Sync .git/objects/ → /tmp (biar GIT_OBJECT_DIRECTORY bisa akses semua objek)
+mkdir -p "$GIT_OBJ_DIR"
+rsync -a .git/objects/ "$GIT_OBJ_DIR/" 2>/dev/null || cp -r .git/objects/* "$GIT_OBJ_DIR/" 2>/dev/null || true
+
+export GIT_OBJECT_DIRECTORY="$GIT_OBJ_DIR"
+
+git "$@"
+
+# Sync balik object baru ke .git/objects/
+rsync -a "$GIT_OBJ_DIR/" .git/objects/ 2>/dev/null || cp -r "$GIT_OBJ_DIR"/* .git/objects/ 2>/dev/null || true

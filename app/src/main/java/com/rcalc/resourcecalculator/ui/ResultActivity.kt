@@ -1,0 +1,173 @@
+package com.rcalc.resourcecalculator.ui
+
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Bundle
+import android.os.Environment
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.rcalc.resourcecalculator.R
+import com.rcalc.resourcecalculator.db.AppDatabase
+import com.rcalc.resourcecalculator.db.ScanResultEntity
+import com.rcalc.resourcecalculator.model.ResourceEntry
+import com.rcalc.resourcecalculator.model.ScanResult
+import com.rcalc.resourcecalculator.ocr.ValueParser
+import com.rcalc.resourcecalculator.rendering.ResultPanelRenderer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+
+class ResultActivity : AppCompatActivity() {
+
+    private lateinit var ivResult: ImageView
+    private lateinit var tvFood: TextView
+    private lateinit var tvWood: TextView
+    private lateinit var tvStone: TextView
+    private lateinit var tvGold: TextView
+    private lateinit var tvTotalFromItems: TextView
+    private lateinit var tvTotalResources: TextView
+
+    private var resultBitmap: Bitmap? = null
+    private lateinit var scanResult: ScanResult
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_result)
+
+        ivResult = findViewById(R.id.ivResult)
+        tvFood = findViewById(R.id.tvFood)
+        tvWood = findViewById(R.id.tvWood)
+        tvStone = findViewById(R.id.tvStone)
+        tvGold = findViewById(R.id.tvGold)
+        tvTotalFromItems = findViewById(R.id.tvTotalFromItems)
+        tvTotalResources = findViewById(R.id.tvTotalResources)
+
+        val rowsRaw = intent.getStringExtra("result_raw_json") ?: ""
+        val totalFromItems = intent.getDoubleExtra("result_total_from_items", 0.0)
+        val totalResources = intent.getDoubleExtra("result_total_resources", 0.0)
+        val imageUri = intent.getStringExtra("image_uri") ?: ""
+
+        val rows = deserializeRows(rowsRaw)
+        scanResult = ScanResult(rows, totalFromItems, totalResources)
+
+        displayResult(scanResult)
+        loadAndProcessImage(imageUri)
+
+        findViewById<MaterialButton>(R.id.btnSave).setOnClickListener { saveImage() }
+        findViewById<MaterialButton>(R.id.btnShare).setOnClickListener { shareImage() }
+
+        saveToHistory()
+    }
+
+    private fun loadAndProcessImage(uri: String) {
+        lifecycleScope.launch {
+            try {
+                val inputStream = contentResolver.openInputStream(Uri.parse(uri))
+                val original = BitmapFactory.decodeStream(inputStream)
+                if (original == null) return@launch
+
+                resultBitmap = withContext(Dispatchers.IO) {
+                    ResultPanelRenderer.appendResultPanel(original, scanResult)
+                }
+                ivResult.setImageBitmap(resultBitmap)
+            } catch (e: Exception) {
+                Toast.makeText(this@ResultActivity, "Gagal memproses gambar", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun displayResult(result: ScanResult) {
+        for (row in result.rows) {
+            val text = "${row.name}: ${ValueParser.formatCompact(row.fromItems)} / ${ValueParser.formatCompact(row.total)}"
+            when (row.name.lowercase()) {
+                "food" -> tvFood.text = text
+                "wood" -> tvWood.text = text
+                "stone" -> tvStone.text = text
+                "gold" -> tvGold.text = text
+            }
+        }
+        tvTotalFromItems.text = "${getString(R.string.result_from_items)}: ${ValueParser.formatCompact(result.totalFromItems)}"
+        tvTotalResources.text = "${getString(R.string.result_total_resources)}: ${ValueParser.formatCompact(result.totalResources)}"
+    }
+
+    private fun saveImage() {
+        val bitmap = resultBitmap ?: return
+        lifecycleScope.launch {
+            try {
+                val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                val file = File(dir, "RCalc_${System.currentTimeMillis()}.jpg")
+                withContext(Dispatchers.IO) {
+                    FileOutputStream(file).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    }
+                }
+                Toast.makeText(this@ResultActivity, "Gambar disimpan", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@ResultActivity, "Gagal menyimpan: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun shareImage() {
+        val bitmap = resultBitmap ?: return
+        lifecycleScope.launch {
+            try {
+                val cacheDir = cacheDir
+                val file = File(cacheDir, "RCalc_share_${System.currentTimeMillis()}.jpg")
+                withContext(Dispatchers.IO) {
+                    FileOutputStream(file).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    }
+                }
+                val uri = FileProvider.getUriForFile(
+                    this@ResultActivity,
+                    "${packageName}.fileprovider",
+                    file
+                )
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/jpeg"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(intent, "Bagikan hasil"))
+            } catch (e: Exception) {
+                Toast.makeText(this@ResultActivity, "Gagal membagikan: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun saveToHistory() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val dao = AppDatabase.getInstance(this@ResultActivity).scanResultDao()
+            dao.insert(
+                ScanResultEntity(
+                    fromItemsFormatted = ValueParser.formatCompact(scanResult.totalFromItems),
+                    totalResourcesFormatted = ValueParser.formatCompact(scanResult.totalResources),
+                    resultImagePath = null,
+                    rawJson = serializeRows(scanResult.rows)
+                )
+            )
+        }
+    }
+
+    private fun serializeRows(rows: List<ResourceEntry>): String {
+        return rows.joinToString("|") { "${it.name}:${it.fromItems}:${it.total}" }
+    }
+
+    private fun deserializeRows(raw: String): List<ResourceEntry> {
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").map { part ->
+            val s = part.split(":")
+            ResourceEntry(name = s[0], fromItems = s[1].toDoubleOrNull() ?: 0.0, total = s[2].toDoubleOrNull() ?: 0.0)
+        }
+    }
+}

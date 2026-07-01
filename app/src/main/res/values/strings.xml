@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RCalc</string>
+    <string name="scan_button">Pindai Gambar</string>
+    <string name="history_button">Riwayat</string>
+    <string name="save_button">Simpan ke Galeri</string>
+    <string name="share_button">Bagikan</string>
+    <string name="retry_button">Coba Lagi</string>
+    <string name="loading_ocr">Memproses gambar…</string>
+    <string name="error_no_table">Tidak dapat mendeteksi tabel resource. Pastikan screenshot jelas dan mengandung data resource (Food, Wood, Stone, Gold).</string>
+    <string name="history_title">Riwayat Pindai</string>
+    <string name="history_empty">Belum ada riwayat pindai.</string>
+    <string name="delete_all">Hapus Semua</string>
+    <string name="result_from_items">Total From Items</string>
+    <string name="result_total_resources">Total Resources</string>
+</resources>
