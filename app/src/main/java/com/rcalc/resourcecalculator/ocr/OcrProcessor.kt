@@ -1,6 +1,7 @@
 package com.rcalc.resourcecalculator.ocr
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -17,7 +18,8 @@ object OcrProcessor {
                     cont.resume(visionText.text) { }
                 }
                 .addOnFailureListener { e ->
-                    cont.resumeWithException(e)
+                    Log.e("OcrProcessor", "OCR gagal", e)
+                    cont.resume("") { }
                 }
         }
     }
