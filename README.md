@@ -34,4 +34,6 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 ## Lisensi
 
+Dirilis di bawah lisensi MIT. Lihat [LICENSE](LICENSE) untuk detail.
+
 Hak cipta © 2026 Arya Maulana Rahmatullah.
