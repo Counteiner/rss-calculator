@@ -13,4 +13,6 @@
     <string name="delete_all">Hapus Semua</string>
     <string name="result_from_items">Total From Items</string>
     <string name="result_total_resources">Total Resources</string>
+    <string name="result_grand_total">Grand Total</string>
+    <string name="result_format_b">Grid Shop</string>
 </resources>

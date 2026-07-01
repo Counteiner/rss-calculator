@@ -16,7 +16,12 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import com.rcalc.resourcecalculator.R
 import com.rcalc.resourcecalculator.model.ScanResult
+import com.rcalc.resourcecalculator.ocr.FormatDetector
+import com.rcalc.resourcecalculator.ocr.GridShopParser
+import com.rcalc.resourcecalculator.ocr.OcrBlock
+import com.rcalc.resourcecalculator.ocr.OcrFormat
 import com.rcalc.resourcecalculator.ocr.OcrProcessor
+import com.rcalc.resourcecalculator.ocr.OcrResult
 import com.rcalc.resourcecalculator.ocr.ResourceTableParser
 import com.rcalc.resourcecalculator.ocr.ValueParser
 import kotlinx.coroutines.Dispatchers
@@ -61,31 +66,65 @@ class ScanActivity : AppCompatActivity() {
                 val resized = resizeIfNeeded(bitmap, 2048)
                 ivPreview.setImageBitmap(resized)
 
-                val rawText = withContext(Dispatchers.IO) {
-                    OcrProcessor.extractText(resized)
+                val ocrResult = withContext(Dispatchers.IO) {
+                    OcrProcessor.extractBlocks(resized)
                 }
 
-                val rows = ResourceTableParser.parse(rawText)
+                val rawText = ocrResult.rawText
+                val format = FormatDetector.detect(rawText)
 
-                if (rows.isEmpty()) {
-                    val preview = rawText.take(300)
-                    Toast.makeText(
-                        this@ScanActivity,
-                        "OCR tidak menghasilkan tabel.\nTeks mentah:\n$preview",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    finish()
-                    return@launch
+                val result: ScanResult
+                val formatLabel: String
+
+                when (format) {
+                    OcrFormat.FORMAT_A -> {
+                        formatLabel = "A"
+                        val rows = ResourceTableParser.parse(rawText)
+                        if (rows.isEmpty()) {
+                            val preview = rawText.take(300)
+                            Toast.makeText(
+                                this@ScanActivity,
+                                "Format A: tabel tidak terdeteksi.\nTeks mentah:\n$preview",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            finish()
+                            return@launch
+                        }
+                        val totalFromItems = rows.sumOf { it.fromItems }
+                        val totalResources = rows.sumOf { it.total }
+                        result = ScanResult(rows, totalFromItems, totalResources)
+                    }
+                    OcrFormat.FORMAT_B -> {
+                        formatLabel = "B"
+                        val rows = GridShopParser.parse(
+                            blocks = ocrResult.blocks,
+                            imageWidth = resized.width,
+                            imageHeight = resized.height
+                        )
+                        if (rows.isEmpty()) {
+                            val preview = rawText.take(300)
+                            Toast.makeText(
+                                this@ScanActivity,
+                                "Format B: grid tidak terdeteksi.\nTeks mentah:\n$preview",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            finish()
+                            return@launch
+                        }
+                        val grandTotal = rows.sumOf { it.fromItems }
+                        result = ScanResult(rows, grandTotal, grandTotal)
+                    }
+                    OcrFormat.UNKNOWN -> {
+                        showError("Format gambar tidak dikenali. Gunakan screenshot tabel resource atau grid shop.")
+                        return@launch
+                    }
                 }
-
-                val totalFromItems = rows.sumOf { it.fromItems }
-                val totalResources = rows.sumOf { it.total }
-                val result = ScanResult(rows, totalFromItems, totalResources)
 
                 val intent = Intent(this@ScanActivity, ResultActivity::class.java).apply {
-                    putExtra("result_raw_json", serializeRows(rows))
-                    putExtra("result_total_from_items", totalFromItems)
-                    putExtra("result_total_resources", totalResources)
+                    putExtra("result_format", formatLabel)
+                    putExtra("result_raw_json", serializeRows(result.rows))
+                    putExtra("result_total_from_items", result.totalFromItems)
+                    putExtra("result_total_resources", result.totalResources)
                     putExtra("image_uri", uri.toString())
                     putExtra("raw_ocr_text", rawText)
                 }

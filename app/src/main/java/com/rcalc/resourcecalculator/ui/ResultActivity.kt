@@ -6,7 +6,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
@@ -43,6 +42,7 @@ class ResultActivity : AppCompatActivity() {
 
     private var resultBitmap: Bitmap? = null
     private lateinit var scanResult: ScanResult
+    private var resultFormat: String = "A"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +57,7 @@ class ResultActivity : AppCompatActivity() {
         tvTotalResources = findViewById(R.id.tvTotalResources)
         tvRawOcr = findViewById(R.id.tvRawOcr)
 
+        resultFormat = intent.getStringExtra("result_format") ?: "A"
         val rowsRaw = intent.getStringExtra("result_raw_json") ?: ""
         val totalFromItems = intent.getDoubleExtra("result_total_from_items", 0.0)
         val totalResources = intent.getDoubleExtra("result_total_resources", 0.0)
@@ -95,7 +96,7 @@ class ResultActivity : AppCompatActivity() {
                 if (original == null) return@launch
 
                 resultBitmap = withContext(Dispatchers.IO) {
-                    ResultPanelRenderer.appendResultPanel(original, scanResult)
+                    ResultPanelRenderer.appendResultPanel(original, scanResult, resultFormat)
                 }
                 ivResult.setImageBitmap(resultBitmap)
             } catch (e: Exception) {
@@ -105,17 +106,31 @@ class ResultActivity : AppCompatActivity() {
     }
 
     private fun displayResult(result: ScanResult) {
-        for (row in result.rows) {
-            val text = "${row.name}: ${ValueParser.formatCompact(row.fromItems)} / ${ValueParser.formatCompact(row.total)}"
-            when (row.name.lowercase()) {
-                "food" -> tvFood.text = text
-                "wood" -> tvWood.text = text
-                "stone" -> tvStone.text = text
-                "gold" -> tvGold.text = text
+        if (resultFormat == "B") {
+            for (row in result.rows) {
+                val text = "${row.name}: ${ValueParser.formatCompact(row.fromItems)}"
+                when (row.name.lowercase()) {
+                    "food" -> tvFood.text = text
+                    "wood" -> tvWood.text = text
+                    "stone" -> tvStone.text = text
+                    "gold" -> tvGold.text = text
+                }
             }
+            tvTotalFromItems.text = "${getString(R.string.result_grand_total)}: ${ValueParser.formatCompact(result.totalFromItems)}"
+            tvTotalResources.text = getString(R.string.result_format_b)
+        } else {
+            for (row in result.rows) {
+                val text = "${row.name}: ${ValueParser.formatCompact(row.fromItems)} / ${ValueParser.formatCompact(row.total)}"
+                when (row.name.lowercase()) {
+                    "food" -> tvFood.text = text
+                    "wood" -> tvWood.text = text
+                    "stone" -> tvStone.text = text
+                    "gold" -> tvGold.text = text
+                }
+            }
+            tvTotalFromItems.text = "${getString(R.string.result_from_items)}: ${ValueParser.formatCompact(result.totalFromItems)}"
+            tvTotalResources.text = "${getString(R.string.result_total_resources)}: ${ValueParser.formatCompact(result.totalResources)}"
         }
-        tvTotalFromItems.text = "${getString(R.string.result_from_items)}: ${ValueParser.formatCompact(result.totalFromItems)}"
-        tvTotalResources.text = "${getString(R.string.result_total_resources)}: ${ValueParser.formatCompact(result.totalResources)}"
     }
 
     private fun saveImage() {
@@ -181,7 +196,7 @@ class ResultActivity : AppCompatActivity() {
             dao.insert(
                 ScanResultEntity(
                     fromItemsFormatted = ValueParser.formatCompact(scanResult.totalFromItems),
-                    totalResourcesFormatted = ValueParser.formatCompact(scanResult.totalResources),
+                    totalResourcesFormatted = if (resultFormat == "B") "Grid" else ValueParser.formatCompact(scanResult.totalResources),
                     resultImagePath = null,
                     rawJson = serializeRows(scanResult.rows)
                 )

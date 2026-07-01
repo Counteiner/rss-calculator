@@ -37,7 +37,7 @@ Repo ini kemungkinan berada di storage HP (`/sdcard/` atau `/storage/emulated/0/
   - Atau, kalau tersedia wrapper khusus (seperti `gitc` pada proyek referensi), gunakan itu
 - Untuk operasi **baca** (`status`, `log`, `diff`, `show`), `git` biasa umumnya aman dipakai langsung di path FUSE
 - Jika menemukan `.git/` sudah dalam kondisi rusak (index corrupt, object hilang), curigai dulu penyebabnya rename non-atomic di FUSE sebelum coba solusi lain
-- Belum ada wrapper script (`gitc` atau semacamnya) disiapkan di proyek ini — kalau operasi Git langsung bermasalah, tanyakan ke user dulu sebelum membuat/menerapkan workaround, karena ini menyentuh infrastruktur bukan cuma kode fitur.
+- **`gitc` sudah tersedia** di root proyek dan merupakan cara PERTAMA untuk operasi tulis Git. Gunakan `bash gitc add ...` dan `bash gitc commit ...` di dalam root proyek. Jika `GIT_OBJECT_DIRECTORY` tidak diset, gitc akan mensync `.git/objects/` ke `/tmp` dulu, menjalankan `git`, lalu sync balik — menghindari atomic rename issue pada FUSE. Jangan jalankan `git add`/`git commit` langsung tanpa gitc.
 
 ## Scope produk (ringkas dari prd.md)
 

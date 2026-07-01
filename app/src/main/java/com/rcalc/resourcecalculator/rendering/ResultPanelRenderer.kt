@@ -9,12 +9,22 @@ import com.rcalc.resourcecalculator.ocr.ValueParser
 
 object ResultPanelRenderer {
 
-    fun appendResultPanel(original: Bitmap, result: ScanResult): Bitmap {
+    fun appendResultPanel(original: Bitmap, result: ScanResult, format: String = "A"): Bitmap {
         val width = original.width
         val title = "HASIL PERHITUNGAN"
-        val line1 = "Total From Items: ${ValueParser.formatCompact(result.totalFromItems)}"
-        val line2 = "Total Resources : ${ValueParser.formatCompact(result.totalResources)}"
-        val lines = listOf(title, line1, line2)
+
+        val lines = if (format == "B") {
+            listOf(
+                title,
+                "Grand Total: ${ValueParser.formatCompact(result.totalFromItems)}"
+            )
+        } else {
+            listOf(
+                title,
+                "Total From Items: ${ValueParser.formatCompact(result.totalFromItems)}",
+                "Total Resources : ${ValueParser.formatCompact(result.totalResources)}"
+            )
+        }
 
         val titlePaint = Paint().apply {
             color = android.graphics.Color.rgb(255, 215, 0)
