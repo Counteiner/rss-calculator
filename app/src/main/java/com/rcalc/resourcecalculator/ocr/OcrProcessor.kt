@@ -17,7 +17,7 @@ object OcrProcessor {
                     cont.resume(visionText.text) { }
                 }
                 .addOnFailureListener { e ->
-                    cont.resume("") { }
+                    cont.resumeWithException(e)
                 }
         }
     }

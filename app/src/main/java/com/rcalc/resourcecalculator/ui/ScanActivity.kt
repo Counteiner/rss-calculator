@@ -1,19 +1,20 @@
 package com.rcalc.resourcecalculator.ui
 
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.lifecycleScope
 import com.rcalc.resourcecalculator.R
-import com.rcalc.resourcecalculator.model.ResourceEntry
 import com.rcalc.resourcecalculator.model.ScanResult
 import com.rcalc.resourcecalculator.ocr.OcrProcessor
 import com.rcalc.resourcecalculator.ocr.ResourceTableParser
@@ -21,7 +22,6 @@ import com.rcalc.resourcecalculator.ocr.ValueParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
 
 class ScanActivity : AppCompatActivity() {
 
@@ -50,24 +50,28 @@ class ScanActivity : AppCompatActivity() {
         lifecycleScope.launch {
             showLoading(true)
             try {
-                val inputStream: InputStream? = contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
+                val bitmap = withContext(Dispatchers.IO) {
+                    loadRotatedBitmap(uri)
+                }
                 if (bitmap == null) {
                     showError("Gagal membaca gambar")
                     return@launch
                 }
-                ivPreview.setImageBitmap(bitmap)
+
+                val resized = resizeIfNeeded(bitmap, 2048)
+                ivPreview.setImageBitmap(resized)
 
                 val rawText = withContext(Dispatchers.IO) {
-                    OcrProcessor.extractText(bitmap)
+                    OcrProcessor.extractText(resized)
                 }
 
                 val rows = ResourceTableParser.parse(rawText)
 
                 if (rows.isEmpty()) {
+                    val preview = rawText.take(300)
                     Toast.makeText(
                         this@ScanActivity,
-                        getString(R.string.error_no_table),
+                        "OCR tidak menghasilkan tabel.\nTeks mentah:\n$preview",
                         Toast.LENGTH_LONG
                     ).show()
                     finish()
@@ -88,14 +92,53 @@ class ScanActivity : AppCompatActivity() {
                 finish()
 
             } catch (e: Exception) {
-                showError("Terjadi kesalahan: ${e.message}")
+                showError("Gagal memproses: ${e.message}")
             } finally {
                 showLoading(false)
             }
         }
     }
 
-    private fun serializeRows(rows: List<ResourceEntry>): String {
+    private fun loadRotatedBitmap(uri: Uri): Bitmap? {
+        val inputStream = contentResolver.openInputStream(uri) ?: return null
+
+        val orientation = try {
+            val exif = ExifInterface(inputStream)
+            exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        } catch (e: Exception) {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+
+        inputStream.close()
+
+        val rawBitmap = contentResolver.openInputStream(uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream)
+        } ?: return null
+
+        val rotation = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+
+        if (rotation == 0f) return rawBitmap
+
+        val matrix = Matrix().apply { postRotate(rotation) }
+        return Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+    }
+
+    private fun resizeIfNeeded(bitmap: Bitmap, maxDim: Int): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (w <= maxDim && h <= maxDim) return bitmap
+        val scale = minOf(maxDim.toFloat() / w, maxDim.toFloat() / h)
+        val newW = (w * scale).toInt()
+        val newH = (h * scale).toInt()
+        return Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+    }
+
+    private fun serializeRows(rows: List<com.rcalc.resourcecalculator.model.ResourceEntry>): String {
         return rows.joinToString("|") { "${it.name}:${it.fromItems}:${it.total}" }
     }
 
