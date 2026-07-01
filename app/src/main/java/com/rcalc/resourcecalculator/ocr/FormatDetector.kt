@@ -8,7 +8,7 @@ object FormatDetector {
         val lower = rawText.lowercase()
 
         if (lower.contains("from items")) {
-            return FORMAT_A
+            return OcrFormat.FORMAT_A
         }
 
         val values = ValueParser.findValues(rawText, 1000.0)
@@ -19,11 +19,11 @@ object FormatDetector {
                 lower.contains("boosts") ||
                 lower.contains("statistics")
             ) {
-                return FORMAT_B
+                return OcrFormat.FORMAT_B
             }
-            return FORMAT_A
+            return OcrFormat.FORMAT_A
         }
 
-        return UNKNOWN
+        return OcrFormat.UNKNOWN
     }
 }
