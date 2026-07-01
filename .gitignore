@@ -9,3 +9,9 @@
 .cxx
 local.properties
 /app/build
+
+# Screenshot & gambar
+*.jpg
+*.jpeg
+*.png
+*.gif
