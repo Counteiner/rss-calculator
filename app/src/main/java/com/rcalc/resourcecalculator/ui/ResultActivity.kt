@@ -1,5 +1,6 @@
 package com.rcalc.resourcecalculator.ui
 
+import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
@@ -67,7 +68,16 @@ class ResultActivity : AppCompatActivity() {
 
         displayResult(scanResult)
         if (rawOcr.isNotBlank()) {
-            tvRawOcr.text = "OCR: $rawOcr"
+            tvRawOcr.text = "OCR:\n$rawOcr"
+            tvRawOcr.setOnLongClickListener {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("OCR", rawOcr))
+                Toast.makeText(this, "Teks OCR disalin", Toast.LENGTH_SHORT).show()
+                true
+            }
+            lifecycleScope.launch(Dispatchers.IO) {
+                File(filesDir, "ocr_debug.txt").writeText(rawOcr)
+            }
         }
         loadAndProcessImage(imageUri)
 
