@@ -13,11 +13,10 @@
         android:textColor="@color/accent_gold"
         android:textSize="28sp"
         android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@id/tvSubtitle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVerticalChainStyle="packed" />
+        app:layout_goneMarginTop="48dp" />
 
     <TextView
         android:id="@+id/tvSubtitle"
@@ -27,7 +26,6 @@
         android:text="Scanner Resource Game"
         android:textColor="@color/text_secondary"
         android:textSize="14sp"
-        app:layout_constraintBottom_toTopOf="@id/btnScan"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvTitle" />
@@ -41,7 +39,6 @@
         android:text="@string/scan_button"
         android:textSize="16sp"
         app:cornerRadius="12dp"
-        app:layout_constraintBottom_toTopOf="@id/btnHistory"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvSubtitle" />
