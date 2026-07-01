@@ -1,11 +1,14 @@
 package com.rcalc.resourcecalculator.ui
 
+import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -35,6 +38,7 @@ class ResultActivity : AppCompatActivity() {
     private lateinit var tvGold: TextView
     private lateinit var tvTotalFromItems: TextView
     private lateinit var tvTotalResources: TextView
+    private lateinit var tvRawOcr: TextView
 
     private var resultBitmap: Bitmap? = null
     private lateinit var scanResult: ScanResult
@@ -50,16 +54,21 @@ class ResultActivity : AppCompatActivity() {
         tvGold = findViewById(R.id.tvGold)
         tvTotalFromItems = findViewById(R.id.tvTotalFromItems)
         tvTotalResources = findViewById(R.id.tvTotalResources)
+        tvRawOcr = findViewById(R.id.tvRawOcr)
 
         val rowsRaw = intent.getStringExtra("result_raw_json") ?: ""
         val totalFromItems = intent.getDoubleExtra("result_total_from_items", 0.0)
         val totalResources = intent.getDoubleExtra("result_total_resources", 0.0)
         val imageUri = intent.getStringExtra("image_uri") ?: ""
+        val rawOcr = intent.getStringExtra("raw_ocr_text") ?: ""
 
         val rows = deserializeRows(rowsRaw)
         scanResult = ScanResult(rows, totalFromItems, totalResources)
 
         displayResult(scanResult)
+        if (rawOcr.isNotBlank()) {
+            tvRawOcr.text = "OCR: $rawOcr"
+        }
         loadAndProcessImage(imageUri)
 
         findViewById<MaterialButton>(R.id.btnSave).setOnClickListener { saveImage() }
@@ -103,16 +112,27 @@ class ResultActivity : AppCompatActivity() {
         val bitmap = resultBitmap ?: return
         lifecycleScope.launch {
             try {
-                val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-                val file = File(dir, "RCalc_${System.currentTimeMillis()}.jpg")
-                withContext(Dispatchers.IO) {
-                    FileOutputStream(file).use { out ->
+                val filename = "RCalc_${System.currentTimeMillis()}.jpg"
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/RCalc")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+                val uri = contentResolver.insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
+                )
+                if (uri != null) {
+                    contentResolver.openOutputStream(uri)?.use { out ->
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
                     }
+                    contentValues.clear()
+                    contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, contentValues, null, null)
                 }
-                Toast.makeText(this@ResultActivity, "Gambar disimpan", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ResultActivity, "Tersimpan di album RCalc", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(this@ResultActivity, "Gagal menyimpan: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@ResultActivity, "Gagal simpan: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

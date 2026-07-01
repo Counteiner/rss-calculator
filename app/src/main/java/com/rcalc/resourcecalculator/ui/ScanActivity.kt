@@ -87,6 +87,7 @@ class ScanActivity : AppCompatActivity() {
                     putExtra("result_total_from_items", totalFromItems)
                     putExtra("result_total_resources", totalResources)
                     putExtra("image_uri", uri.toString())
+                    putExtra("raw_ocr_text", rawText)
                 }
                 startActivity(intent)
                 finish()

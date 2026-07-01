@@ -32,7 +32,7 @@ object ResourceTableParser {
     )
 
     private fun extractCandidates(text: String, minValue: Double): List<Candidate> {
-        val pattern = Regex("""([A-Za-z]\w*)\s+([\d.,]+\s*[KMB]?)\s+([\d.,]+\s*[KMB]?)""")
+        val pattern = Regex("""([A-Za-z]\w*)\W+([\d.,]+\s*[KMB]?)\W+([\d.,]+\s*[KMB]?)""")
         val matches = pattern.findAll(text)
         val result = mutableListOf<Candidate>()
 
