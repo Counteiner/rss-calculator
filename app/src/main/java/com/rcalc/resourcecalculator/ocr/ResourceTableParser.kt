@@ -23,7 +23,6 @@ object ResourceTableParser {
             val total = nums.last().value
             rows.add(ResourceEntry(name = name.replaceFirstChar { it.uppercase() }, fromItems = fromItems, total = total))
         }
-        val nameOrder = rows.associate { it.name }.keys
         val resourceOrder = listOf("Food", "Wood", "Stone", "Gold")
         return rows.sortedBy { r -> resourceOrder.indexOf(r.name).let { if (it < 0) Int.MAX_VALUE else it } }
     }
