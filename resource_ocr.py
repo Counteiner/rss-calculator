@@ -173,40 +173,24 @@ def parse_resource_table(text, min_value=1000):
 
 
 def main(image_path, min_value=1000):
-    print(f"📷 Membaca gambar: {image_path}\n")
-
     raw_text = extract_text(image_path)
-    print("=== TEKS HASIL OCR (mentah) ===")
-    print(raw_text)
-    print("================================\n")
 
     rows = parse_resource_table(raw_text, min_value)
 
     if not rows:
-        print("Tidak ada tabel resource yang terdeteksi, coba tampilkan angka mentah:")
-        for v in find_values(raw_text):
-            print(f"  {v['raw']} -> {format_compact(v['value'])}")
         return
 
-    print("=== TABEL RESOURCE TERDETEKSI ===")
-    print(f"{'Resource':<10}{'From Items':>15}{'Total':>15}")
     total_from_items = 0
     total_total = 0
     for r in rows:
-        print(f"{r['name']:<10}{format_compact(r['from_items']):>15}{format_compact(r['total']):>15}")
         total_from_items += r["from_items"]
         total_total += r["total"]
-
-    print("\n=== HASIL PERHITUNGAN ===")
-    print(f"Jumlah resource terdeteksi     : {len(rows)}")
-    print(f"Total kolom 'From Items'       : {format_compact(total_from_items)}")
-    print(f"Total kolom 'Total Resources'  : {format_compact(total_total)}")
 
     import os
     base_name = os.path.basename(image_path).rsplit(".", 1)[0]
     output_path = base_name + "_hasil.jpg"
     append_result_panel(image_path, rows, total_from_items, total_total, output_path)
-    print(f"\n🖼️  Gambar dengan hasil perhitungan disimpan di: {output_path}")
+    print(output_path)
 
 
 if __name__ == "__main__":

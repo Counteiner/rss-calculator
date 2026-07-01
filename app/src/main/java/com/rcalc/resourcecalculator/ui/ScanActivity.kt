@@ -81,10 +81,9 @@ class ScanActivity : AppCompatActivity() {
                         formatLabel = "A"
                         val rows = ResourceTableParser.parse(rawText)
                         if (rows.isEmpty()) {
-                            val preview = rawText.take(300)
                             Toast.makeText(
                                 this@ScanActivity,
-                                "Format A: tabel tidak terdeteksi.\nTeks mentah:\n$preview",
+                                "Format A: tabel tidak terdeteksi.",
                                 Toast.LENGTH_LONG
                             ).show()
                             finish()
@@ -102,10 +101,9 @@ class ScanActivity : AppCompatActivity() {
                             imageHeight = resized.height
                         )
                         if (rows.isEmpty()) {
-                            val preview = rawText.take(300)
                             Toast.makeText(
                                 this@ScanActivity,
-                                "Format B: grid tidak terdeteksi.\nTeks mentah:\n$preview",
+                                "Format B: grid tidak terdeteksi.",
                                 Toast.LENGTH_LONG
                             ).show()
                             finish()
@@ -126,7 +124,6 @@ class ScanActivity : AppCompatActivity() {
                     putExtra("result_total_from_items", result.totalFromItems)
                     putExtra("result_total_resources", result.totalResources)
                     putExtra("image_uri", uri.toString())
-                    putExtra("raw_ocr_text", rawText)
                 }
                 startActivity(intent)
                 finish()

@@ -1,6 +1,5 @@
 package com.rcalc.resourcecalculator.ui
 
-import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
@@ -26,7 +25,6 @@ import com.rcalc.resourcecalculator.rendering.ResultPanelRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.FileOutputStream
 
 class ResultActivity : AppCompatActivity() {
@@ -38,8 +36,6 @@ class ResultActivity : AppCompatActivity() {
     private lateinit var tvGold: TextView
     private lateinit var tvTotalFromItems: TextView
     private lateinit var tvTotalResources: TextView
-    private lateinit var tvRawOcr: TextView
-
     private var resultBitmap: Bitmap? = null
     private lateinit var scanResult: ScanResult
     private var resultFormat: String = "A"
@@ -55,31 +51,16 @@ class ResultActivity : AppCompatActivity() {
         tvGold = findViewById(R.id.tvGold)
         tvTotalFromItems = findViewById(R.id.tvTotalFromItems)
         tvTotalResources = findViewById(R.id.tvTotalResources)
-        tvRawOcr = findViewById(R.id.tvRawOcr)
 
         resultFormat = intent.getStringExtra("result_format") ?: "A"
         val rowsRaw = intent.getStringExtra("result_raw_json") ?: ""
         val totalFromItems = intent.getDoubleExtra("result_total_from_items", 0.0)
         val totalResources = intent.getDoubleExtra("result_total_resources", 0.0)
         val imageUri = intent.getStringExtra("image_uri") ?: ""
-        val rawOcr = intent.getStringExtra("raw_ocr_text") ?: ""
-
         val rows = deserializeRows(rowsRaw)
         scanResult = ScanResult(rows, totalFromItems, totalResources)
 
         displayResult(scanResult)
-        if (rawOcr.isNotBlank()) {
-            tvRawOcr.text = "OCR:\n$rawOcr"
-            tvRawOcr.setOnLongClickListener {
-                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("OCR", rawOcr))
-                Toast.makeText(this, "Teks OCR disalin", Toast.LENGTH_SHORT).show()
-                true
-            }
-            lifecycleScope.launch(Dispatchers.IO) {
-                File(filesDir, "ocr_debug.txt").writeText(rawOcr)
-            }
-        }
         loadAndProcessImage(imageUri)
 
         findViewById<MaterialButton>(R.id.btnSave).setOnClickListener { saveImage() }

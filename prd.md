@@ -36,10 +36,26 @@ Membuat aplikasi Android yang memungkinkan pemain **memindai screenshot resource
 ## 4. Cakupan Produk (Scope)
 
 ### 4.1 Dalam Cakupan (In Scope)
-Aplikasi ini **khusus** dirancang untuk mendeteksi tabel resource dengan format berikut:
+Aplikasi ini mendukung deteksi dua format tampilan resource yang umum ditemui di game:
+
+**Format A — Tabel "Your Resources & Speedups"**
 - 4 jenis resource: **Food, Wood, Stone, Gold**
 - 2 kolom angka per resource: **From Items** dan **Total Resources**
 - Format angka: angka desimal + suffix K/M/B (contoh: `19.3M`, `764,942`)
+
+**Format B — Grid Shop/Marketplace (tab RESOURCES)**
+- Grid berukuran **4 baris × 4 kolom** (16 kotak total):
+  - Setiap **baris** mewakili satu jenis resource, urutan dari atas: **Food, Wood, Stone, Gold**
+  - Setiap **kolom** mewakili varian/paket dengan nominal berbeda untuk jenis resource yang sama, terurut dari nominal terkecil (kolom 1, kiri) ke nominal terbesar (kolom 4, kanan)
+- Setiap kotak berisi **2 angka**:
+  - **Angka nominal paket** (ditampilkan besar, di tengah kotak) — contoh: `10,000`, `50,000`, `150,000`, `500,000`
+  - **Badge jumlah dimiliki** (ditampilkan kecil, di pojok kanan-bawah kotak) — contoh: `1,174`, `118`, `6`, `3`
+- Setiap kotak **selalu memiliki badge jumlah dimiliki**; badge ini wajib dideteksi terpisah dari angka nominal karena posisi dan ukurannya berbeda (font lebih kecil, area lebih sempit)
+- Aplikasi menjumlahkan **total nilai resource** per jenis (nilai paket × jumlah dimiliki, dijumlahkan untuk seluruh 4 kotak dalam satu baris/jenis), lalu menampilkan total keseluruhan dari 4 jenis resource
+- **Panel detail item di sisi kanan** (contoh: "Lvl 2 Resource Pack" beserta deskripsi, kontrol jumlah, tombol "USE") **tidak termasuk dalam cakupan deteksi** — aplikasi hanya memproses area grid resource, panel kanan diabaikan sepenuhnya
+- Format angka: angka dengan pemisah ribuan (contoh: `10,000`, `2,796`) maupun singkat K/M/B bila muncul
+
+Aplikasi mendeteksi otomatis format mana yang sesuai dengan screenshot yang dipindai (Format A atau Format B) sebelum melakukan parsing dan perhitungan.
 
 ### 4.2 Di Luar Cakupan (Out of Scope untuk v1.0)
 - Deteksi resource dari game lain dengan tabel/layout berbeda
@@ -57,14 +73,22 @@ Aplikasi ini **khusus** dirancang untuk mendeteksi tabel resource dengan format 
 
 ### 5.2 Deteksi Otomatis (OCR)
 - Mendeteksi teks dan angka pada gambar menggunakan OCR on-device
-- Mengenali baris tabel resource (Food, Wood, Stone, Gold) beserta dua kolom angkanya
-- Mengenali dan mengonversi format singkat K/M/B (bukan hanya angka penuh)
+- Mengenali secara otomatis format tampilan yang dipindai: **Format A** (tabel "Your Resources & Speedups") atau **Format B** (grid shop/marketplace tab RESOURCES)
+- **Format A**: mengenali baris tabel resource (Food, Wood, Stone, Gold) beserta dua kolom angkanya (From Items, Total Resources)
+- **Format B**: mengenali baris grid per jenis resource (Food, Wood, Stone, Gold), mengekstrak pasangan angka nilai-paket dan jumlah-dimiliki dari tiap kotak, serta membatasi area deteksi hanya pada grid kiri — mengabaikan panel detail item di sisi kanan layar
+- Mengenali dan mengonversi format singkat K/M/B maupun angka dengan pemisah ribuan (bukan hanya satu jenis format angka)
 - Menangani variasi hasil bacaan OCR yang kurang sempurna (misal salah baca "Gold" jadi "Cold") dengan tetap mengekstrak angka dengan benar
 
 ### 5.3 Perhitungan Total
+**Format A:**
 - Menjumlahkan otomatis kolom **From Items** (total dari 4 resource)
 - Menjumlahkan otomatis kolom **Total Resources** (total dari 4 resource)
-- Menampilkan hasil dalam format ringkas (K/M/B), bukan angka panjang berderet nol
+
+**Format B:**
+- Menghitung total nilai per jenis resource (nilai paket × jumlah dimiliki, dijumlahkan seluruh kotak dalam satu baris)
+- Menjumlahkan total keseluruhan dari 4 jenis resource (Food, Wood, Stone, Gold)
+
+Kedua format menampilkan hasil dalam format ringkas (K/M/B), bukan angka panjang berderet nol.
 
 ### 5.4 Tampilan Hasil
 - Menampilkan hasil pindai dalam bentuk kartu ringkas: rincian per resource + total keseluruhan
@@ -106,8 +130,36 @@ Aplikasi ini **khusus** dirancang untuk mendeteksi tabel resource dengan format 
 
 ## 8. Pertimbangan Teknis
 
-- **Mesin OCR**: menggunakan library OCR on-device Android (misal Google ML Kit Text Recognition) alih-alih Tesseract CLI, karena lebih ringan dan native untuk Android, tidak butuh instalasi binary terpisah
+### 8.1 Mesin OCR
+
+**Strategi utama: Google ML Kit Text Recognition v2**
+- Dipilih sebagai mesin OCR utama untuk v1.0 karena:
+  - Akurasi tinggi (>95%) untuk teks digital UI dengan kontras jelas seperti angka resource game
+  - On-device, gratis, tidak butuh koneksi internet — sesuai requirement privasi & offline
+  - Ringan (~15-30MB tambahan), sesuai target ukuran app <50MB
+  - Integrasi native Android (Kotlin/Java) tanpa perlu convert model, mempercepat waktu pengembangan
+  - Didukung dan dimaintain langsung oleh Google dengan update rutin
+
+**Preprocessing gambar sebelum OCR**
+Untuk menaikkan akurasi, terutama pada teks kecil seperti badge angka "dimiliki" di sudut kotak grid (Format B), gambar diproses terlebih dahulu sebelum dikirim ke ML Kit:
+- **Upscale** gambar 2x pada area yang akan di-OCR (khususnya badge angka kecil)
+- **Peningkatan kontras/sharpening** untuk mempertegas batas karakter
+- **Crop area** sesuai format yang terdeteksi (Format A: seluruh tabel; Format B: hanya grid kiri, mengecualikan panel detail item di kanan)
+
+**Validasi pasca-OCR**
+- Regex ketat untuk memvalidasi pola angka + suffix K/M/B atau pemisah ribuan (mengikuti pendekatan yang sudah terbukti pada prototipe Python)
+- Hasil yang tidak cocok pola diperlakukan sebagai kegagalan deteksi (lihat section 5.6), bukan dipaksakan jadi angka yang salah
+
+**Fallback plan: PaddleOCR (mobile/lite)**
+- ML Kit dipilih sebagai solusi utama karena kemudahan integrasi dan kecukupan akurasi untuk kasus umum. Namun **PaddleOCR** (via PaddleLite/NCNN) dicatat sebagai kandidat fallback bila hasil testing lapangan menunjukkan ML Kit sering gagal pada kasus tertentu — khususnya teks kecil dan padat seperti badge angka di Format B, di mana algoritma deteksi teks PaddleOCR (DB algorithm) secara umum lebih unggul
+- Keputusan migrasi ke PaddleOCR **tidak diambil di awal v1.0** karena effort integrasinya jauh lebih besar (perlu convert model ke format mobile, tidak ada library resmi plug-and-play seperti ML Kit) — dievaluasi hanya jika target akurasi 95% (section 7) tidak tercapai dengan ML Kit + preprocessing setelah testing pada sampel screenshot nyata
+- Jika fallback diaktifkan, PaddleOCR diusulkan dipakai secara selektif hanya untuk area badge angka kecil di Format B, sementara ML Kit tetap dipakai untuk area teks lain — untuk menjaga ukuran app dan performa
+
+### 8.2 Parsing & Rendering
+
 - **Parsing hasil OCR**: logika regex untuk mendeteksi pola angka + suffix K/M/B (mengikuti pendekatan yang sudah terbukti pada prototipe Python)
+- **Deteksi format & area crop untuk Format B**: sebelum OCR dijalankan, aplikasi mengidentifikasi batas area grid resource (kolom kiri) dan mengecualikan panel detail item di kolom kanan (judul item, deskripsi, kontrol jumlah, tombol "USE") dari area yang diproses, agar tidak ikut terbaca sebagai data resource
+- **Pengelompokan hasil OCR ke grid (Format B)**: karena ML Kit mengembalikan teks per blok berdasarkan posisi (bukan per kotak grid), diperlukan logika tambahan untuk memetakan bounding box hasil OCR ke struktur grid 4 baris (jenis resource) × 4 kolom (varian nominal), lalu memasangkan setiap angka nominal paket dengan badge jumlah dimiliki pada kotak yang sama berdasarkan kedekatan posisi (angka nominal di tengah kotak, badge di pojok kanan-bawah kotak yang sama)
 - **Rendering gambar hasil**: menggambar panel teks di atas kanvas gambar (setara fungsi `append_result_panel` pada prototipe), diimplementasikan dengan Canvas API Android
 - **Penyimpanan riwayat**: database lokal ringan (Room/SQLite) untuk menyimpan metadata hasil pindai
 

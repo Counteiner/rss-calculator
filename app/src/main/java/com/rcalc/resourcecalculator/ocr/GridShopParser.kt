@@ -1,13 +1,11 @@
 package com.rcalc.resourcecalculator.ocr
 
-import android.util.Log
 import com.rcalc.resourcecalculator.model.ResourceEntry
 import kotlin.math.abs
 
 object GridShopParser {
 
     private val RESOURCE_NAMES = listOf("Food", "Wood", "Stone", "Gold")
-    private const val TAG = "GridShopParser"
 
     fun parse(
         blocks: List<OcrBlock>,
@@ -16,7 +14,6 @@ object GridShopParser {
     ): List<ResourceEntry> {
         val gridBlocks = blocks.filter { it.left < imageWidth * 0.6 }
         if (gridBlocks.size < 8) {
-            Log.w(TAG, "Too few blocks in grid area: ${gridBlocks.size}")
             return emptyList()
         }
 
@@ -27,7 +24,6 @@ object GridShopParser {
 
         val rowGroups = kMeans(middle, 4) { it.centerY.toDouble() }
         if (rowGroups.size != 4) {
-            Log.w(TAG, "Row clustering gave ${rowGroups.size} groups, expected 4")
             return emptyList()
         }
         val sortedRows = rowGroups.sortedBy { row ->
@@ -40,7 +36,6 @@ object GridShopParser {
 
             val colGroups = kMeans(rowBlocks, 4) { it.centerX.toDouble() }
             if (colGroups.size != 4) {
-                Log.w(TAG, "${RESOURCE_NAMES[idx]} row: got ${colGroups.size} cols, expected 4")
                 results.add(ResourceEntry(RESOURCE_NAMES[idx], 0.0, 0.0))
                 continue
             }
@@ -49,15 +44,13 @@ object GridShopParser {
             }
 
             var rowTotal = 0.0
-            for ((ci, cell) in sortedCols.withIndex()) {
+            for ((_, cell) in sortedCols.withIndex()) {
                 val cellSum = extractCellTotal(cell)
-                Log.d(TAG, "${RESOURCE_NAMES[idx]} col$ci: blocks=${cell.size} total=$cellSum")
                 rowTotal += cellSum
             }
             results.add(ResourceEntry(RESOURCE_NAMES[idx], rowTotal, rowTotal))
         }
 
-        Log.d(TAG, "Results: ${results.map { "${it.name}=${it.fromItems}" }}")
         return results
     }
 
