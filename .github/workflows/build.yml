@@ -24,7 +24,10 @@ jobs:
           java-version: 17
           distribution: 'temurin'
 
-      - name: Setup Gradle & Build APK
+      - name: Setup Gradle & cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build APK
         run: |
           gradle wrapper --gradle-version 8.5
           ./gradlew assembleDebug
